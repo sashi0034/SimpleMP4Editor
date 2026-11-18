@@ -59,8 +59,13 @@ internal static class MediaTools
         if (video.ValueKind == JsonValueKind.Undefined) throw new InvalidDataException("映像トラックがありません。");
         var audio = streams.FirstOrDefault(s => s.GetProperty("codec_type").GetString() == "audio");
         var format = json.RootElement.GetProperty("format");
-        double offset = Value(video, "start_time") - Value(format, "start_time");
+        int videoIndex = (int)Value(video, "index");
+        double videoStart = Value(video, "start_time");
+        double offset = videoStart - Value(format, "start_time");
+        double fps = Math.Clamp(Ratio(video.GetProperty("avg_frame_rate").GetString(), '/', 30), 1, 240);
         double duration = Value(video, "duration", Value(format, "duration") - offset);
+        if (duration <= 0 && Path.GetExtension(path).Equals(".webm", StringComparison.OrdinalIgnoreCase))
+            duration = await ReadPacketDurationAsync(path, videoIndex, videoStart, fps, token);
         int width = (int)Value(video, "width"), height = (int)Value(video, "height");
         double sar = Ratio(video.TryGetProperty("sample_aspect_ratio", out var ratio) ? ratio.GetString() : null, ':', 1);
         width = (int)Math.Round(width * sar);
@@ -70,11 +75,26 @@ internal static class MediaTools
                 if (entry.TryGetProperty("rotation", out _)) angle = (int)Math.Round(Value(entry, "rotation"));
         if (Math.Abs(angle) % 180 == 90) (width, height) = (height, width);
         if (width < 1 || height < 1 || duration <= 0) throw new InvalidDataException("映像のサイズまたは長さを取得できません。");
-        double fps = Ratio(video.GetProperty("avg_frame_rate").GetString(), '/', 30);
         bool hasAudio = audio.ValueKind != JsonValueKind.Undefined;
-        return new(Path.GetFullPath(path), width, height, duration, Math.Clamp(fps, 1, 240), hasAudio,
+        return new(Path.GetFullPath(path), width, height, duration, fps, hasAudio,
             angle != 0 || sar != 1 || Math.Abs(offset) > 0.001 || video.GetProperty("codec_name").GetString() != "h264",
-            (int)Value(video, "index"), hasAudio ? (int)Value(audio, "index") : -1, offset);
+            videoIndex, hasAudio ? (int)Value(audio, "index") : -1, offset);
+    }
+
+    // Browser recordings can omit both the stream and container duration.
+    private static async Task<double> ReadPacketDurationAsync(string path, int videoIndex, double start, double fps, CancellationToken token)
+    {
+        double duration = 0;
+        await RunAsync("ffprobe", ["-v", "error", "-select_streams", videoIndex.ToString(CultureInfo.InvariantCulture),
+            "-show_entries", "packet=pts_time,duration_time", "-of", "csv=p=0", path], token, line =>
+        {
+            var fields = line.Split(',');
+            if (!double.TryParse(fields[0], CultureInfo.InvariantCulture, out var pts) || !double.IsFinite(pts)) return;
+            double length = fields.Length > 1 && double.TryParse(fields[1], CultureInfo.InvariantCulture, out var seconds)
+                && double.IsFinite(seconds) && seconds > 0 ? seconds : 1 / fps;
+            duration = Math.Max(duration, pts + length - start);
+        });
+        return duration;
     }
 
     // FFmpeg autorotates before this filter. All editing coordinates use square display pixels.

@@ -56,7 +56,7 @@ public partial class MainWindow : Window
     private async void OpenFiles(object sender, RoutedEventArgs e)
     {
         if (importing || exportJob != null) return;
-        var dialog = new OpenFileDialog { Filter = "MP4 動画|*.mp4", Multiselect = true, Title = "動画を追加" };
+        var dialog = new OpenFileDialog { Filter = "動画 (MP4・WebM)|*.mp4;*.webm", Multiselect = true, Title = "動画を追加" };
         if (dialog.ShowDialog(this) == true) await AddFilesAsync(dialog.FileNames);
     }
 
@@ -74,8 +74,8 @@ public partial class MainWindow : Window
                 try
                 {
                     Status.Text = $"読み込み中  {Path.GetFileName(path)}";
-                    if (!string.Equals(Path.GetExtension(path), ".mp4", StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("MP4 ファイルを選んでください。");
+                    if (Path.GetExtension(path).ToLowerInvariant() is not (".mp4" or ".webm"))
+                        throw new InvalidDataException("MP4 または WebM ファイルを選んでください。");
                     var existing = clips.FirstOrDefault(c => string.Equals(c.Media.Path, path, StringComparison.OrdinalIgnoreCase));
                     var media = existing?.Media ?? await MediaTools.ProbeAsync(path, lifetime.Token);
                     var clip = new Clip(media);

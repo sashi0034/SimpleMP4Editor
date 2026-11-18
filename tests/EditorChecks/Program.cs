@@ -19,7 +19,7 @@ internal static class Program
             CheckGeometry();
             var sample = CheckVideosAsync(folder.FullName).GetAwaiter().GetResult();
             CheckWindow(sample, args.Length == 1 ? args[0] : null);
-            Console.WriteLine("PASS  crop geometry, decoded MP4 output, audio, file handling, WPF layout");
+            Console.WriteLine("PASS  crop geometry, WebM input, decoded MP4 output, audio, file handling, WPF layout");
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -130,7 +130,35 @@ internal static class Program
         byte[] retained = await File.ReadAllBytesAsync(outFile);
         Check(previous.SequenceEqual(retained), "existing file preserved");
         Check(!Directory.EnumerateFiles(dir, ".simplemp4-*").Any(), "partial file cleaned");
+        await CheckWebMAsync(dir, second);
         return first;
+    }
+
+    private static async Task CheckWebMAsync(string dir, Clip silentMp4)
+    {
+        string source = Path.Combine(dir, "画面録画 テスト.WEBM");
+        await Ffmpeg("-f", "lavfi", "-i", "color=red:s=64x32:r=12:d=2,drawbox=x=32:y=0:w=32:h=32:c=lime:t=fill",
+            "-f", "lavfi", "-i", "sine=f=700:d=2", "-c:v", "libvpx-vp9", "-c:a", "libopus", "-live", "1", source);
+        var media = await MediaTools.ProbeAsync(source, Token);
+        Check(media.NeedsProxy && media.HasAudio && Math.Abs(media.Duration - 2) < .02, "WebM recording without header duration");
+        Check((await MediaTools.StillAsync(media, .5, 128, Token)).Length > 0, "WebM seek preview");
+        string proxy = Path.Combine(dir, "webm-preview.mp4");
+        await MediaTools.MakeProxyAsync(media, proxy, Token);
+        var preview = await MediaTools.ProbeAsync(proxy, Token);
+        Check(!preview.NeedsProxy && preview.HasAudio, "WebM playback proxy");
+
+        var clip = new Clip(media) { Crop = new(32, 0, 64, 32) };
+        clip.SetBoundary(true, 1.25); clip.SetBoundary(false, 1.75);
+        Clip[] mixed = [clip, silentMp4];
+        string output = Output.DefaultPath(mixed);
+        Check(Path.GetExtension(output) == ".mp4", "WebM default export extension");
+        await MediaTools.ExportAsync(mixed, false, output, null, Token);
+        var pixels = await Pixels(output);
+        Check(pixels.Length == 12 * 32 * 32 * 3, "trimmed WebM and MP4 duration");
+        Color(pixels, 32, 32, 5, 16, 16, 0, 255, 0);
+        Color(pixels, 32, 32, 6, 16, 16, 255, 255, 0);
+        var pcm = await Ffmpeg("-i", output, "-vn", "-ac", "1", "-ar", "48000", "-f", "s16le", "pipe:1");
+        Check(MeanVolume(pcm, .25) > 500 && MeanVolume(pcm, .75) < 30, "WebM audio followed by silent MP4");
     }
 
     private static double MeanVolume(byte[] pcm, double second)

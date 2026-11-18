@@ -43,7 +43,7 @@
        <local:CropOverlay x:Name="Overlay"/>
        <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center">
         <Path Data="M 2,3 L 26,3 26,21 2,21 Z M 11,8 L 18,12 11,16 Z" Stroke="#85E4CF" StrokeThickness="1.5" Stretch="Uniform" Width="46" Height="36" HorizontalAlignment="Center"/>
-        <TextBlock Text="MP4 をここにドロップ" Foreground="White" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,14,0,6"/>
+        <TextBlock Text="MP4・WebM をここにドロップ" Foreground="White" FontSize="19" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,14,0,6"/>
         <Button Content="ファイルを選ぶ" Click="OpenFiles" HorizontalAlignment="Center" Padding="14,4"/>
        </StackPanel>
       </Grid>
