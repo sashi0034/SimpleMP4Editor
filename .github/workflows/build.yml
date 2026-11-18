@@ -7,6 +7,8 @@ permissions:
 jobs:
   windows:
     runs-on: windows-2025
+    outputs:
+      artifact_id: ${{ steps.portable.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -23,8 +25,41 @@ jobs:
       - name: Publish portable app
         run: dotnet publish src/SimpleMP4Editor -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o .artifacts/publish
       - uses: actions/upload-artifact@v4
+        id: portable
         with:
           name: SimpleMP4Editor-win-x64
           path: .artifacts/publish/
           include-hidden-files: true
           if-no-files-found: error
+
+  release:
+    needs: windows
+    if: github.event_name == 'push' && !github.event.deleted && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: build-${{ github.run_number }}
+    steps:
+      - name: Download the tested ZIP
+        env:
+          ARTIFACT_ID: ${{ needs.windows.outputs.artifact_id }}
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "$GITHUB_API_URL/repos/$GH_REPO/actions/artifacts/$ARTIFACT_ID/zip" \
+            -o SimpleMP4Editor-win-x64.zip
+          unzip -tq SimpleMP4Editor-win-x64.zip
+      - name: Publish GitHub Release
+        run: |
+          if draft=$(gh release view "$TAG" --json isDraft --jq '.isDraft'); then
+            if [[ "$draft" == false ]]; then exit 0; fi
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --draft \
+              --title "Simple MP4 Editor · Build $GITHUB_RUN_NUMBER" --generate-notes
+          fi
+          gh release upload "$TAG" SimpleMP4Editor-win-x64.zip --clobber
+          gh release edit "$TAG" --draft=false

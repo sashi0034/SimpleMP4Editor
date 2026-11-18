@@ -4,7 +4,7 @@ MP4 の映像範囲と時間区間を選び、1本の動画に保存する Windo
 
 ## 起動
 
-GitHub の **Actions → Windows build → 成功した実行 → Artifacts** から **SimpleMP4Editor-win-x64** をダウンロードします。ZIP をフォルダーに展開し、SimpleMP4Editor.exe を起動してください。.NET、FFmpeg、ffprobe は配布物に含まれます。
+GitHub の **Releases** でリリースを開き、**Assets** から **SimpleMP4Editor-win-x64.zip** をダウンロードします。ZIP をフォルダーに展開し、SimpleMP4Editor.exe を起動してください。.NET、FFmpeg、ffprobe は配布物に含まれます。
 
 ## 操作
 
@@ -25,4 +25,6 @@ dotnet run --project tests/EditorChecks -c Release --no-build
 dotnet publish src/SimpleMP4Editor -c Release -r win-x64 --self-contained true -o .artifacts/publish
 ~~~
 
-各 push で同じビルド・テストを実行し、成功すると自己完結型の配布物を Actions に保存します。FFmpeg の配布元、ソースコード情報、ライセンスは同梱の tools/README.txt と tools/LICENSE.txt にあります。
+各 push でビルド・テストを実行し、成功すると配布用 ZIP を Actions の Artifacts に保存します。デフォルトブランチへの push では、同じ ZIP を GitHub Releases にも公開します。タグは `build-<実行番号>` の形式で自動作成されます。
+
+FFmpeg の配布元、ソースコード情報、ライセンスは同梱の tools/README.txt と tools/LICENSE.txt にあります。
