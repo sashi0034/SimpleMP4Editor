@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/SimpleMP4Editor/SimpleMP4Editor.csproj" />
+  <Folder Name="/Tests/">
+    <Project Path="tests/EditorChecks/EditorChecks.csproj" />
+  </Folder>
+</Solution>

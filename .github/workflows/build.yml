@@ -1,0 +1,30 @@
+name: Windows build
+on: [push, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/cache@v4
+        with:
+          path: .tools
+          key: ffmpeg-windows-x64-${{ hashFiles('scripts/Get-MediaTools.ps1') }}
+      - name: Build
+        run: dotnet build SimpleMP4Editor.slnx -c Release
+      - name: Check cropping and exported video
+        run: dotnet run --project tests/EditorChecks -c Release --no-build
+      - name: Publish portable app
+        run: dotnet publish src/SimpleMP4Editor -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -o .artifacts/publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SimpleMP4Editor-win-x64
+          path: .artifacts/publish/
+          include-hidden-files: true
+          if-no-files-found: error
